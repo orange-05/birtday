@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // Validation for Timeline
+    function isValidTimeline(data) {
+      return data.media is map && (data.keys().hasOnly(['media', 'chapters']) || data.keys().hasOnly(['media']));
+    }
+
+    // Validation for Vault
+    function isValidVault(data) {
+      return (data.media is list) && (data.notes is string) && (data.keys().hasOnly(['media', 'notes']));
+    }
+
+    // Validation for Coupons
+    function isValidCoupons(data) {
+      return data.keys().hasAll(['redeemed']) && (data.redeemed is map);
+    }
+
+    // Validation for MediaUrl
+    function isValidMediaUrl(data) {
+      return data.keys().hasAll(['url']) && (data.url is string);
+    }
+
+    // Since the app uses a manual admin password and no Firebase Auth for writes in the original code,
+    // and 'set_up_firebase' only enables Google Login, I'll allow reads to everyone
+    // but writes will be restricted. 
+    // Ideally, the user should be authenticated as the specific admin.
+    // For now, I'll allow public reads and restrict writes to authenticated users (as a baseline)
+    // and advise the user to harden it.
+    
+    function isOwner() {
+      return request.auth != null && 
+             request.auth.token.email == 'karthikeyankkarthik7@gmail.com' && 
+             request.auth.token.email_verified == true;
+    }
+
+    match /app_data/{docId} {
+      allow read: if true;
+      
+      allow create, update: if isOwner() && (
+        (docId == 'timeline' && isValidTimeline(incoming())) ||
+        (docId == 'vault' && isValidVault(incoming())) ||
+        (docId == 'coupons' && isValidCoupons(incoming())) ||
+        (docId == 'video' && isValidMediaUrl(incoming())) ||
+        (docId == 'music' && isValidMediaUrl(incoming()))
+      );
+      
+      allow delete: if isOwner();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

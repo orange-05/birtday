@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "Timeline": {
+      "title": "Timeline Data",
+      "description": "Stores media associated with timeline chapters",
+      "type": "object",
+      "properties": {
+        "media": {
+          "type": "object",
+          "description": "Map of chapter index to list of media objects"
+        }
+      }
+    },
+    "Vault": {
+      "title": "Vault Data",
+      "description": "Stores secret media and notes",
+      "type": "object",
+      "properties": {
+        "media": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "Coupons": {
+      "title": "Coupons Data",
+      "description": "Stores redeemed status of coupons",
+      "type": "object",
+      "properties": {
+        "redeemed": {
+          "type": "object"
+        }
+      }
+    },
+    "MediaUrl": {
+      "title": "Simple Media URL",
+      "description": "Stores a single media URL",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "app_data/timeline": {
+      "schema": { "$ref": "#/entities/Timeline" },
+      "description": "Timeline memories container"
+    },
+    "app_data/vault": {
+      "schema": { "$ref": "#/entities/Vault" },
+      "description": "Secret vault content"
+    },
+    "app_data/coupons": {
+      "schema": { "$ref": "#/entities/Coupons" },
+      "description": "Coupons redemption state"
+    },
+    "app_data/video": {
+      "schema": { "$ref": "#/entities/MediaUrl" },
+      "description": "Special birthday video URL"
+    },
+    "app_data/music": {
+      "schema": { "$ref": "#/entities/MediaUrl" },
+      "description": "Background music URL"
+    }
+  }
+}
