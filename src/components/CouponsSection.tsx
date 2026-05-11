@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const COUPONS = [
   { emoji: '💆', title: '1 Free Massage', desc: 'Redeemable anytime, anywhere. No expiry.', color: '#e8305a' },
@@ -16,27 +16,25 @@ export default function CouponsSection() {
   const [redeemed, setRedeemed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const path = 'app_data/coupons';
-    const unsub = onSnapshot(doc(db, path), (snap) => {
+    const unsub = onSnapshot(doc(db, 'app_data', 'coupons'), (snap) => {
       if (snap.exists()) {
         setRedeemed(snap.data().redeemed || {});
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, path);
+      handleFirestoreError(error, OperationType.GET, 'app_data/coupons');
     });
     return unsub;
   }, []);
 
   const redeem = async (i: number) => {
     if (redeemed[i]) return;
-    const path = 'app_data/coupons';
     const newRedeemed = { ...redeemed, [i]: true };
     setRedeemed(newRedeemed);
     try {
-      await setDoc(doc(db, path), { redeemed: newRedeemed }, { merge: true });
+      await setDoc(doc(db, 'app_data', 'coupons'), { redeemed: newRedeemed }, { merge: true });
       confetti({ particleCount: 100, spread: 80, colors: ['#e8305a', '#c9956c'] });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, path);
+      handleFirestoreError(err, OperationType.WRITE, 'app_data/coupons');
     }
   };
 
@@ -76,7 +74,7 @@ export default function CouponsSection() {
               
               {!redeemed[i] && (
                 <div className="px-6 py-2 bg-gradient-to-r from-rose-600 to-amber-600 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-rose-500/20">
-                  Redeem Claim ✦
+                   Claim Now
                 </div>
               )}
             </div>

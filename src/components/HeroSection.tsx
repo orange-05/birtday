@@ -2,41 +2,43 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Heart, Sparkles, ChevronDown, Mail } from 'lucide-react';
 
-const RelationshipCounter = () => {
-    const targetDate = new Date('2026-05-12T00:00:00');
-    const [elapsed, setElapsed] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
+const AgeCounter = () => {
+    const birthDate = new Date('2005-05-12T00:00:00');
+    const [age, setAge] = useState({ years: 0, days: 0, hours: 0, mins: 0 });
 
     useEffect(() => {
         const calc = () => {
             const now = new Date();
-            let diff = targetDate.getTime() - now.getTime();
-            if (diff < 0) diff = 0;
+            const diff = now.getTime() - birthDate.getTime();
 
-            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const years = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+            const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 365.25)) / (1000 * 60 * 60 * 24));
             const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const secs = Math.floor((diff % (1000 * 60)) / 1000);
 
-            setElapsed({ days, hours, mins, secs });
+            setAge({ years, days, hours, mins });
         };
         calc();
-        const t = setInterval(calc, 1000);
+        const t = setInterval(calc, 60000); // Update every minute is enough for age
         return () => clearInterval(t);
     }, []);
 
     return (
-        <div className="mt-16 flex flex-wrap gap-6 justify-center">
-            {[
-                { val: elapsed.days, label: 'Days' },
-                { val: elapsed.hours, label: 'Hours' },
-                { val: elapsed.mins, label: 'Minutes' },
-                { val: elapsed.secs, label: 'Seconds' },
-            ].map(({ val, label }) => (
-                <div key={label} className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-3xl min-w-[100px] text-center shadow-xl">
-                    <div className="font-display text-4xl font-bold text-rose-500 mb-1">{val}</div>
-                    <div className="font-ui text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</div>
-                </div>
-            ))}
+        <div className="mt-16">
+            <p className="text-white/40 text-[10px] uppercase tracking-[0.3em] mb-6 font-bold">You've been lighting up the world for</p>
+            <div className="flex flex-wrap gap-4 justify-center">
+                {[
+                    { val: age.years, label: 'Years' },
+                    { val: age.days, label: 'Days' },
+                    { val: age.hours, label: 'Hours' },
+                    { val: age.mins, label: 'Minutes' },
+                ].map(({ val, label }) => (
+                    <div key={label} className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-3xl min-w-[90px] text-center shadow-xl">
+                        <div className="font-display text-3xl font-bold text-rose-500 mb-1">{val}</div>
+                        <div className="font-ui text-[9px] uppercase tracking-[0.2em] text-white/40">{label}</div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
@@ -97,7 +99,7 @@ export default function HeroSection() {
                     <Sparkles className="w-4 h-4" />
                 </button>
 
-                <RelationshipCounter />
+                <AgeCounter />
             </motion.div>
 
             {/* Scroll Indicator */}

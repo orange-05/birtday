@@ -5,9 +5,9 @@ import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)");
 export const storage = getStorage(app);
+export const auth = getAuth(app);
 
 export enum OperationType {
   CREATE = 'create',
@@ -58,14 +58,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Simple connection test
 async function testConnection() {
-  const path = 'test/connection'
   try {
-    await getDocFromServer(doc(db, path));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
-    } else if (error instanceof Error && error.message.includes('permission')) {
-      handleFirestoreError(error, OperationType.GET, path);
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error: any) {
+    if (error.message.includes('offline')) {
+      console.warn("Firebase is offline or config is invalid.");
     }
   }
 }

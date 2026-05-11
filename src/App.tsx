@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './lib/firebase';
 import { 
   Heart, 
   Lock, 
@@ -18,32 +20,8 @@ import {
   Moon,
   Sun
 } from 'lucide-react';
-import { db, storage, auth } from './lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
 
-// Types
-interface Media {
-  url: string;
-  type: string;
-  name: string;
-}
-
-interface TimelineData {
-  media: Record<string, Media[]>;
-}
-
-interface VaultData {
-  media: Media[];
-  notes: string;
-}
-
-interface CouponData {
-  redeemed: Record<string, boolean>;
-}
-
-// Context
+// --- Context ---
 import { AdminContext } from './lib/context';
 import { SECTIONS } from './components/Constants';
 import CustomCursor from './components/CustomCursor';
@@ -59,77 +37,151 @@ import LetterSection from './components/LetterSection';
 import MusicPlayer from './components/MusicPlayer';
 
 // Constants
-const ADMIN_PASSWORD = 'kavro2026';
+const ADMIN_PASSWORD = '07122019';
 
 // --- Sub-components ---
 
-// Admin Login Component
-const AdminLogin = ({ onLogin }: { onLogin: (isAdmin: boolean) => void }) => {
-  const [show, setShow] = useState(false);
+// Admin Login Component - Simple Password Only
+const AdminLogin = ({ onLogin, show, setShow }: { onLogin: (isAdmin: boolean) => void; show: boolean; setShow: (v: boolean) => void }) => {
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-        e.preventDefault();
-        setShow(true);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+  const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const tryLogin = async () => {
+    setAuthError(null);
+    if (!password) {
+      setAuthError("Please enter the administrator password.");
+      return;
+    }
+
     if (password === ADMIN_PASSWORD) {
+      setLoading(true);
       try {
         const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
         const result = await signInWithPopup(auth, provider);
-        const user = result.user;
         
-        if (user.email === 'karthikeyankkarthik7@gmail.com') {
+        if (result.user.email === 'karthikeyankkarthik7@gmail.com') {
           sessionStorage.setItem('isAdmin', 'true');
           onLogin(true);
           setShow(false);
           setPassword('');
+          confetti({
+            particleCount: 150,
+            spread: 90,
+            origin: { y: 0.6 },
+            colors: ['#e8305a', '#ffb548', '#ffffff']
+          });
         } else {
-          alert("Unauthorized access. Only the owner can enter admin mode.");
-          await auth.signOut();
+          setAuthError("Unauthorized: Only the project owner can access admin features.");
+          await signOut(auth);
         }
-      } catch (err) {
-        console.error("Auth error:", err);
+      } catch (err: any) {
+        console.error("Login error:", err);
+        switch (err.code) {
+          case 'auth/configuration-not-found':
+            setAuthError("Configuration Error: Google Sign-In is not enabled in Firebase Console.");
+            break;
+          case 'auth/unauthorized-domain':
+            setAuthError(`Domain not authorized: Please add ${window.location.hostname} to authorized domains in Firebase.`);
+            break;
+          case 'auth/popup-closed-by-user':
+            setAuthError("Login cancelled. Popup was closed before completion.");
+            break;
+          case 'auth/popup-blocked':
+            setAuthError("Popup blocked: Please allow popups for this site to sign in.");
+            break;
+          case 'auth/network-request-failed':
+            setAuthError("Network error: Please check your internet connection.");
+            break;
+          case 'auth/internal-error':
+            setAuthError("Firebase internal error. Please try again later.");
+            break;
+          default:
+            setAuthError(err.message || "An unexpected error occurred during sign-in.");
+        }
+      } finally {
+        setLoading(false);
       }
     } else {
-      setError(true);
-      setTimeout(() => setError(false), 800);
+      setAuthError("Incorrect administrator password.");
       setPassword('');
     }
   };
 
   if (!show) return null;
   return (
-    <div className="fixed inset-0 z-[100000] bg-black/85 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-white/10 rounded-3xl p-10 max-w-sm w-full text-center backdrop-blur-xl">
-        <div className="text-6xl mb-6">🔑</div>
-        <h3 className="text-2xl font-bold text-white mb-2 font-display">Admin Access</h3>
-        <p className="text-white/50 italic mb-8 text-sm">Sign in with Google + Password</p>
-        <input 
-          type="password" 
-          placeholder="Admin password..." 
-          value={password} 
-          onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && tryLogin()}
-          className={`w-full bg-white/5 border rounded-xl py-3 px-4 text-white text-center outline-none transition-all mb-4 ${error ? 'border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.2)]' : 'border-white/10 focus:border-rose-500/50'}`}
-        />
-        {error && <p className="text-rose-500 text-xs italic mb-4">Incorrect password</p>}
-        <button 
-          onClick={tryLogin}
-          className="w-full bg-gradient-to-r from-rose-500 to-amber-500 py-3 rounded-xl text-white font-bold shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
-        >
-          🔓 Enter Admin Mode
-        </button>
-        <button onClick={() => setShow(false)} className="mt-4 text-white/30 text-xs hover:text-white/50 transition-colors">Cancel</button>
-      </div>
+    <div className="fixed inset-0 z-[100000] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="bg-[#1a1416] border border-white/10 rounded-[2.5rem] p-10 max-w-sm w-full text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+      >
+        <div className="w-20 h-20 bg-gradient-to-br from-rose-500/20 to-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/5">
+          <Lock className="text-rose-500 w-8 h-8" />
+        </div>
+        <h3 className="text-3xl font-bold text-white mb-2 font-display tracking-tight">Admin Portal</h3>
+        <p className="text-white/40 italic mb-8 text-sm">Step into the controls, Commander.</p>
+        
+        <div className="space-y-4">
+          <div className="relative">
+            <input 
+              type="password" 
+              placeholder="Admin Password" 
+              value={password} 
+              onChange={e => {
+                setPassword(e.target.value);
+                if (authError) setAuthError(null);
+              }}
+              onKeyDown={e => e.key === 'Enter' && !loading && tryLogin()}
+              className={`w-full bg-white/5 border rounded-2xl py-4 px-6 text-white text-center outline-none transition-all ${authError ? 'border-rose-500 bg-rose-500/5' : 'border-white/10 focus:border-rose-500/50 focus:bg-white/10'}`}
+              autoFocus
+              disabled={loading}
+            />
+          </div>
+
+          <AnimatePresence mode="wait">
+            {authError && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3"
+              >
+                <p className="text-rose-400 text-xs font-medium leading-relaxed">{authError}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button 
+            onClick={tryLogin}
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 py-4 rounded-2xl text-white font-bold shadow-xl shadow-rose-500/20 active:scale-95 transition-all text-sm uppercase tracking-widest disabled:opacity-50 disabled:cursor-wait flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                />
+                Verifying...
+              </>
+            ) : (
+              'Initialize Login'
+            )}
+          </button>
+          
+          <button 
+            onClick={() => {
+              if (!loading) setShow(false);
+            }} 
+            className="text-white/20 text-[10px] uppercase tracking-[0.3em] font-black hover:text-white/40 transition-colors py-2"
+          >
+            Abort Mission
+          </button>
+        </div>
+      </motion.div>
     </div>
   );
 };
@@ -178,20 +230,46 @@ const FloatingHearts = () => {
 // Main App Component
 export default function App() {
   const [loaded, setLoaded] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem('isAdmin') === 'true');
+  const [isAdmin, setIsAdmin] = useState(() => {
+    try {
+      return sessionStorage.getItem('isAdmin') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [activeSection, setActiveSection] = useState(0);
   const [isLight, setIsLight] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user && user.email === 'karthikeyankkarthik7@gmail.com' && sessionStorage.getItem('isAdmin') === 'true') {
-         setIsAdmin(true);
+        setIsAdmin(true);
       } else {
-         setIsAdmin(false);
+        setIsAdmin(false);
       }
     });
-    return unsub;
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setShowAdminLogin(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => {
+      unsub();
+      window.removeEventListener('keydown', handler);
+    };
   }, []);
+
+  const handleLogout = async () => {
+    if (confirm("Exit Admin Mode?")) {
+      await signOut(auth);
+      sessionStorage.removeItem('isAdmin');
+      setIsAdmin(false);
+    }
+  };
 
   // Section observer
   useEffect(() => {
@@ -235,7 +313,7 @@ export default function App() {
             <motion.div 
               initial={{ scale: 0.8, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              className="bg-zinc-900 border border-rose-500/50 rounded-[2rem] p-12 max-w-lg w-full text-center relative overflow-hidden"
+              className="bg-zinc-900 border border-rose-500/50 rounded-[2rem] p-12 max-w-lg w-full text-center relative overflow-hidden shadow-2xl"
             >
               <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-rose-500/10 to-transparent pointer-events-none" />
               <div className="text-8xl mb-8 animate-bounce">🎈</div>
@@ -247,8 +325,11 @@ export default function App() {
                 Wishing you a day as incredible as you are.
               </p>
               <button 
-                onClick={() => setShowAlarm(false)}
-                className="w-full bg-white text-black font-black py-5 rounded-2xl text-xl uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-rose-500/20"
+                onClick={() => {
+                  setShowAlarm(false);
+                  window.dispatchEvent(new CustomEvent('celebrate-start'));
+                }}
+                className="w-full bg-white text-black font-black py-5 rounded-2xl text-xl uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-rose-500/20 shadow-white/10"
               >
                 Let's Celebrate! 🎊
               </button>
@@ -259,7 +340,7 @@ export default function App() {
       <div className={`min-h-screen transition-colors duration-700 ${isLight ? 'bg-rose-50 text-zinc-900' : 'bg-[#0d0508] text-white'} selection:bg-rose-500/30 cursor-none`}>
         <CustomCursor />
         <FloatingHearts />
-        <AdminLogin onLogin={setIsAdmin} />
+        <AdminLogin onLogin={setIsAdmin} show={showAdminLogin} setShow={setShowAdminLogin} />
         
         {/* Navigation */}
         <NavDots active={activeSection} />
@@ -274,6 +355,18 @@ export default function App() {
           </button>
           <MusicPlayer />
         </div>
+
+        {/* Admin Toggle */}
+        <button 
+          id="admin-toggle-button"
+          onClick={() => isAdmin ? handleLogout() : setShowAdminLogin(true)}
+          className={`fixed bottom-6 right-6 z-[9999] p-4 rounded-2xl backdrop-blur-xl border flex items-center gap-3 transition-all active:scale-90 shadow-2xl ${isAdmin ? 'bg-rose-500 border-rose-400 text-white shadow-rose-500/20' : 'bg-white/5 border-white/10 text-white/30 hover:text-white/60 hover:bg-white/10'}`}
+        >
+          {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
+          <span className="font-bold uppercase tracking-widest text-[10px] hidden md:block">
+            {isAdmin ? 'Admin on' : 'Admin off'}
+          </span>
+        </button>
 
         {/* Content */}
         <div className="flex flex-col">
