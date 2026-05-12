@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { Music, Pause } from 'lucide-react';
+import { Music, Pause, Link as LinkIcon } from 'lucide-react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { AdminContext } from '../lib/context';
 
 export default function MusicPlayer() {
   const isAdmin = useContext(AdminContext);
   const [playing, setPlaying] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'app_data', 'music'), (snap) => {
@@ -44,7 +41,7 @@ export default function MusicPlayer() {
 
   const toggle = () => {
     if (!audioUrl) {
-      if (isAdmin) fileRef.current?.click();
+      if (isAdmin) handleSetUrl();
       return;
     }
     if (playing) {
@@ -56,25 +53,23 @@ export default function MusicPlayer() {
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSetUrl = async () => {
     if (!isAdmin) return;
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
+    const promptUrl = prompt("Please enter or paste a direct link to your MP3 file (e.g., from Google Drive direct link or any hosting site):");
+    if (!promptUrl) return;
+    
     try {
-      const storagePath = `music/${Date.now()}_${file.name}`;
-      const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      setAudioUrl(url);
-      await setDoc(doc(db, 'app_data', 'music'), { url }, { merge: true });
-    } catch (err) { handleFirestoreError(err, OperationType.WRITE, 'app_data/music'); }
-    setUploading(false);
+      setAudioUrl(promptUrl);
+      await setDoc(doc(db, 'app_data', 'music'), { url: promptUrl }, { merge: true });
+      if (audioRef.current) audioRef.current.src = promptUrl;
+      alert("Song updated successfully!");
+    } catch (err) { 
+      handleFirestoreError(err, OperationType.WRITE, 'app_data/music'); 
+    }
   };
 
   return (
-    <div className="relative group">
+    <div className="relative group pointer-events-auto">
       <audio ref={audioRef} />
       <button 
         onClick={toggle}
@@ -88,17 +83,17 @@ export default function MusicPlayer() {
       </button>
 
       {isAdmin && (
-        <div className="absolute top-14 right-0 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-[1000]">
-          <p className="text-[10px] text-white/50 uppercase tracking-widest font-bold whitespace-nowrap">Control Background Music</p>
+        <div className="absolute top-14 right-0 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl opacity-0 group-hover:opacity-100 transition-all pointer-events-auto z-[1000]">
+          <p className="text-[10px] text-white/50 uppercase tracking-widest font-bold whitespace-nowrap mb-2">Music Control</p>
           <button 
-             onClick={() => fileRef.current?.click()}
-             className="text-[10px] text-rose-500 underline mt-2 pointer-events-auto block"
+             onClick={handleSetUrl}
+             className="flex items-center gap-2 text-[10px] bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 hover:text-rose-200 border border-rose-500/30 px-3 py-2 rounded-lg w-full transition-all whitespace-nowrap"
           >
-            Change Track
+            <LinkIcon size={12} />
+            Paste MP3 Link
           </button>
         </div>
       )}
-      <input type="file" ref={fileRef} accept="audio/*" className="hidden" onChange={handleFile} />
     </div>
   );
 }
