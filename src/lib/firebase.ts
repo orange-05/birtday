@@ -67,3 +67,39 @@ async function testConnection() {
   }
 }
 testConnection();
+export function compressImageToBase64(file: File, maxDim = 1024): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      // Non-image files fall back to simple read if they're under reasonable size limit for doc DB
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxDim) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+        } else {
+          if (height > maxDim) { width = Math.round(width * (maxDim / height)); height = maxDim; }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(img.src); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        // High compression JPEG target for 1MB firestore cap
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = reject;
+    };
+    reader.onerror = reject;
+  });
+}

@@ -5,8 +5,7 @@ import confetti from 'canvas-confetti';
 import { AdminContext } from '../lib/context';
 
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, compressImageToBase64 } from '../lib/firebase';
 
 const SECRET_PASSWORD = '07122019';
 
@@ -78,23 +77,13 @@ export default function VaultSection() {
       let count = 0;
       for (const file of validFiles) {
         count++;
-        const storagePath = `vault/${Date.now()}_${file.name}`;
-        const storageRef = ref(storage, storagePath);
-        const uploadTask = uploadBytesResumable(storageRef, file);
-
-        await new Promise((resolve, reject) => {
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress({ current: count, total: validFiles.length, percent: Math.round(progress), fileName: file.name });
-            }, 
-            reject, 
-            () => resolve(true)
-          );
-        });
-
-        const url = await getDownloadURL(storageRef);
-        results.push({ url, type: file.type, name: file.name });
+        setUploadProgress({ current: count, total: validFiles.length, percent: 50, fileName: `Compressing ${file.name}...` });
+        
+        // Client side compress & bypass cloud store
+        const base64Str = await compressImageToBase64(file, 800);
+        results.push({ url: base64Str, type: file.type || 'image/jpeg', name: file.name });
+        
+        setUploadProgress(prev => prev ? { ...prev, percent: 100 } : null);
       }
 
       const newMedia = [...vaultMedia, ...results];

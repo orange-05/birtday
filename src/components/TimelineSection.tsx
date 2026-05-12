@@ -4,9 +4,7 @@ import { Camera, Plus, Video as VideoIcon, FileText, ChevronRight, ChevronLeft, 
 import { AdminContext } from '../lib/context';
 
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
-import { handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, compressImageToBase64 } from '../lib/firebase';
 
 const MEMORIES = [
   { id: '1', date: 'september 20, 2024 (fresh date)', emoji: '💘', title: 'The Day We Met', desc: 'The moment the universe decided to be kind to me. You walked in and everything changed.', color: '#e8305a' },
@@ -108,40 +106,34 @@ export default function TimelineSection() {
 
     const currentList = timelineMedia[chapterId] || [];
     
-    setUploadProgress(prev => ({ ...prev, [chapterId]: { current: 0, total: validFiles.length, percent: 0, fileName: '' } }));
+    setUploadProgress(prev => ({ ...prev, [chapterId]: { current: 0, total: validFiles.length, percent: 0, fileName: 'Preparing...' } }));
 
     try {
       const results = [];
       let count = 0;
       for (const file of validFiles) {
         count++;
-        const storagePath = `timeline/${chapterId}/${Date.now()}_${file.name}`;
-        const storageRef = ref(storage, storagePath);
-        const uploadTask = uploadBytesResumable(storageRef, file);
-
-        await new Promise((resolve, reject) => {
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(prev => ({ 
-                ...prev, 
-                [chapterId]: { ...prev[chapterId], current: count, percent: Math.round(progress), fileName: file.name } 
-              }));
-            }, 
-            reject, 
-            () => resolve(true)
-          );
-        });
-
-        const url = await getDownloadURL(storageRef);
-        results.push({ url, type: file.type, name: file.name });
+        setUploadProgress(prev => ({ 
+          ...prev, 
+          [chapterId]: { ...prev[chapterId], current: count, percent: 50, fileName: `Compressing ${file.name}...` } 
+        }));
+        
+        // Bypass cloud storage, compress locally, store as base64 
+        const base64Str = await compressImageToBase64(file, 800); 
+        
+        results.push({ url: base64Str, type: file.type || 'image/jpeg', name: file.name });
+        
+        setUploadProgress(prev => ({ 
+          ...prev, 
+          [chapterId]: { ...prev[chapterId], percent: 100 } 
+        }));
       }
 
       const newList = [...currentList, ...results];
       await setDoc(doc(db, 'app_data', 'timeline'), { media: { ...timelineMedia, [chapterId]: newList } }, { merge: true });
     } catch (err: any) {
       console.error("Upload error:", err);
-      alert("Failed to upload. Please ensure your Firebase Storage rules allow writes and you are logged in as admin.");
+      alert("Failed to process photo. Please try an image file.");
       handleFirestoreError(err, OperationType.WRITE, 'app_data/timeline');
     } finally {
       setUploadProgress(prev => {
