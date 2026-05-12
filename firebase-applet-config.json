@@ -1,9 +1,9 @@
 {
-  "apiKey": "AIzaSyBPBnDjImMCWXpDFlN-kXGAUwZIt3C-Gl8",
-  "authDomain": "gen-lang-client-0035272030.firebaseapp.com",
-  "projectId": "gen-lang-client-0035272030",
-  "storageBucket": "gen-lang-client-0035272030.firebasestorage.app",
-  "messagingSenderId": "92934275639",
-  "appId": "1:92934275639:web:96d053998e300982d6f5b2",
-  "firestoreDatabaseId": "ai-studio-b30ec726-3f85-4d92-8ad8-5fdbd4c8d24a"
+  "apiKey": "AIzaSyANReZi5Q2sSqJmZSVP8r-Wlpu4FVR8WL4",
+  "authDomain": "birthdayapp-1baaf.firebaseapp.com",
+  "projectId": "birthdayapp-1baaf",
+  "storageBucket": "birthdayapp-1baaf.firebasestorage.app",
+  "messagingSenderId": "129858555603",
+  "appId": "1:129858555603:web:5e053b2cd9a8b8e58f4e26",
+  "firestoreDatabaseId": "(default)"
 }
